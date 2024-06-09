@@ -1,0 +1,34 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# dotenv environment variables file
+.env
+
+# Typescript compiled files
+dist/
+build/
+
+# MacOS
+.DS_Store
+
+# Editor directories and files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Jest coverage directory
+coverage/
+
+# npm cache
+.npm/
+
+# Typescript caches
+*.tsbuildinfo
