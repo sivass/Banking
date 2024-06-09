@@ -23,5 +23,5 @@ A production-ready banking application built with Node.js, TypeScript, and Mongo
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/banking-application.git
+git clone https://github.com/sivass/Banking.git
 cd banking-application
