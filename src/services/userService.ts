@@ -10,6 +10,11 @@ export class UserService implements IUserService {
     email: string,
     password: string
   ): Promise<IUser> {
+    
+    const existingUser = await User.findOne({ email });
+    if(existingUser){
+      throw new Error('User already exists');
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({
       firstName,

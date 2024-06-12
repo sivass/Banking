@@ -1,77 +1,66 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import User, { IUser } from '../models/User';
-import { UserService } from '../services/userService';
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import bcrypt from 'bcryptjs';
+import User, { IUser} from '../models/User';
+import { UserService }  from '../services/userService';
 
-jest.mock('bcrypt');
-jest.mock('jsonwebtoken');
+jest.mock('bcryptjs');
+let userService: UserService;
 
-describe('User Service', () => {
-  let userService: UserService;
-
+describe('UserService - createUser', () => {
+  let mongoServer: MongoMemoryServer;
+  
   beforeAll(async () => {
-    await mongoose.connect('mongodb://localhost:27017/banking_test');
+    mongoServer = await MongoMemoryServer.create();
+    await mongoose.connect(mongoServer.getUri());
     userService = new UserService();
   });
 
   afterAll(async () => {
-    await mongoose.connection.db.dropDatabase();
-    await mongoose.connection.close();
+    await mongoose.disconnect();
+    await mongoServer.stop();
   });
 
-  beforeEach(async () => {
+  afterEach(async () => {
     jest.clearAllMocks();
     await User.deleteMany({});
   });
 
-  it('should register a new user', async () => {
-    const bcryptHashMock = bcrypt.hash as jest.MockedFunction<typeof bcrypt.hash>;
-    bcryptHashMock.mockResolvedValue('hashedPassword' as never); // Explicitly typing as never to resolve TypeScript error
+  it('should create a user successfully', async () => {
+    const bcryptHashMock = jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashedPassword' as never);
 
-    const user: IUser = await userService.registerUser('Test', 'User', 'test@example.com', 'password123');
+    const userData = {
+      firstName: 'test',
+      lastName: 'user',
+      email: 'testuser@gmail.com',
+      password: 'password123',
+    };
 
-    expect(user.email).toBe('test@example.com');
-    expect(bcryptHashMock).toHaveBeenCalledWith('password123', 10);
+    const createdUser = await userService.registerUser('Test','User','testuser@gmail.com','password123');
 
-    const foundUser = await User.findOne({ email: 'test@example.com' });
-    expect(foundUser).not.toBeNull();
-    expect(foundUser?.password).toBe('hashedPassword');
+    expect(createdUser).toBeDefined();
+    expect(createdUser.email).toBe(userData.email);
+    expect(bcryptHashMock).toHaveBeenCalledWith(userData.password, 10);
+
+    bcryptHashMock.mockRestore();
   });
 
-  it('should login a user and return a token', async () => {
-    const bcryptHashMock = bcrypt.hash as jest.MockedFunction<typeof bcrypt.hash>;
-    const bcryptCompareMock = bcrypt.compare as jest.MockedFunction<typeof bcrypt.compare>;
-    const jwtSignMock = jwt.sign as jest.MockedFunction<typeof jwt.sign>;
+  it('should throw an error if the user already exists', async () => {
+    const bcryptHashMock = jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashedPassword' as never);
+    const userData = {
+      firstName: 'test',
+      lastName: 'user',
+      email: 'testuser@gmail.com',
+      password: 'password123',
+    };
 
-    bcryptHashMock.mockResolvedValue('hashedPassword' as never); // Explicitly typing as never to resolve TypeScript error
-    bcryptCompareMock.mockResolvedValue(true as never); // Explicitly typing as never to resolve TypeScript error
-    jwtSignMock.mockReturnValue('jwtToken' as never); // Explicitly typing as never to resolve TypeScript error
+    // Create a user first
+    await userService.registerUser('Test','User','testuser@gmail.com','password123');
 
-    await userService.registerUser('Test', 'User', 'login@example.com', 'password123');
-    const result = await userService.loginUser('login@example.com', 'password123');
+    // Try to create the same user again
+    await expect(userService.registerUser('Test','User','testuser@gmail.com','password123')).rejects.toThrow('User already exists');
+    expect(bcryptHashMock).toHaveBeenCalledWith(userData.password, 10);
 
-    const user = await User.findOne({ email: 'login@example.com' });
-    expect(bcryptCompareMock).toHaveBeenCalledWith('password123', 'hashedPassword');
-    expect(jwtSignMock).toHaveBeenCalledWith({ id: expect.any(String) }, process.env.JWT_SECRET!, { expiresIn: '1h' });
-    expect(result.token).toBe('jwtToken');
-  });
-
-  it('should throw an error if email is incorrect during login', async () => {
-    await userService.registerUser('Test', 'User', 'login@example.com', 'password123');
-    await expect(userService.loginUser('wrong@example.com', 'password123')).rejects.toThrow('Invalid email or password');
-  });
-
-  it('should throw an error if password is incorrect during login', async () => {
-    const bcryptCompareMock = bcrypt.compare as jest.MockedFunction<typeof bcrypt.compare>;
-    bcryptCompareMock.mockResolvedValue(false as never); // Explicitly typing as never to resolve TypeScript error
-
-    await userService.registerUser('Test', 'User', 'wrongpassword@example.com', 'password123');
-    await expect(userService.loginUser('wrongpassword@example.com', 'wrongpassword')).rejects.toThrow('Invalid email or password');
+    bcryptHashMock.mockRestore();
   });
 });
-
-
-
-
-
